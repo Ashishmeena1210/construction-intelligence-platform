@@ -1,10 +1,21 @@
+
+import os
+from contextlib import asynccontextmanager
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+
 from database import init_db
-from routers import safety, crack, valuation, planning, weather, assistant, knowledge
-import os
-from dotenv import load_dotenv
+from routers import (
+    safety,
+    crack,
+    valuation,
+    planning,
+    weather,
+    assistant,
+    knowledge,
+)
 
 load_dotenv()
 
@@ -21,23 +32,36 @@ app = FastAPI(
     title="Construction Intelligence Platform API",
     description="AI-Powered Multimodal Construction Intelligence Platform",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:5173,http://localhost:5174,http://localhost:3000"
-).split(",")
+# CORS configuration
+# Set CORS_ORIGINS in Render's Environment settings.
+# Include your deployed frontend URL without a trailing slash.
+default_origins = (
+    "http://localhost:5173,"
+    "http://localhost:5174,"
+    "http://localhost:3000"
+)
+
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS", default_origins
+    ).split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_origin_regex=r"http://localhost:\d+",  # allow any localhost port in dev
+    allow_origin_regex=r"http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Register API routers
 app.include_router(safety.router)
 app.include_router(crack.router)
 app.include_router(valuation.router)
@@ -49,21 +73,45 @@ app.include_router(knowledge.router)
 
 @app.get("/")
 def root():
-    return {"message": "Construction Intelligence Platform API", "version": "1.0.0", "status": "operational"}
+    return {
+        "message": "Construction Intelligence Platform API",
+        "version": "1.0.0",
+        "status": "operational",
+    }
 
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "service": "construction-platform-api"}
+    return {
+        "status": "healthy",
+        "service": "construction-platform-api",
+    }
 
 
 @app.get("/api/history")
 def get_all_history():
     from database import SessionLocal, AnalysisHistory
-    import json
+
     db = SessionLocal()
+
     try:
-        records = db.query(AnalysisHistory).order_by(AnalysisHistory.created_at.desc()).limit(50).all()
-        return {"history": [{"id": r.id, "module": r.module, "input": r.input_summary, "created_at": r.created_at.isoformat()} for r in records]}
+        records = (
+            db.query(AnalysisHistory)
+            .order_by(AnalysisHistory.created_at.desc())
+            .limit(50)
+            .all()
+        )
+
+        return {
+            "history": [
+                {
+                    "id": record.id,
+                    "module": record.module,
+                    "input": record.input_summary,
+                    "created_at": record.created_at.isoformat(),
+                }
+                for record in records
+            ]
+        }
     finally:
         db.close()
